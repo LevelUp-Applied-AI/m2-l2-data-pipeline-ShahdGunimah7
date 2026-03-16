@@ -21,130 +21,116 @@ OUTPUT_DIR = 'output'
 # ─── Pipeline Functions ───────────────────────────────────────────────────────
 
 def load_data(filepath):
-    """Load sales records from a CSV file.
+    """Load sales records from CSV. Returns a DataFrame."""
+    
+    df = pd.read_csv(filepath)
+    
+    print(f"Loaded {len(df)} records from {filepath}")
+    
+    return df
 
-    Args:
-        filepath (str): Path to the CSV file.
-
-    Returns:
-        pd.DataFrame: Raw sales records DataFrame.
-    """
-    # TODO: Load the CSV using pd.read_csv(filepath)
-    # TODO: Print a progress message: f"Loaded {len(df)} records from {filepath}"
-    # TODO: Return the DataFrame
-    pass
 
 
 def clean_data(df):
-    """Handle missing values and fix data types.
+    """Handle missing values and fix data types. Returns a cleaned DataFrame."""
+    
+    df_clean = df.copy()
 
-    - Fill missing 'quantity' values with the column median.
-    - Fill missing 'unit_price' values with the column median.
-    - Parse the 'date' column to datetime (use errors='coerce' to handle malformatted dates).
-    - Print a progress message showing the record count after cleaning.
+    # fill missing values with median
+    df_clean['quantity'] = df_clean['quantity'].fillna(df_clean['quantity'].median())
+    df_clean['unit_price'] = df_clean['unit_price'].fillna(df_clean['unit_price'].median())
 
-    Args:
-        df (pd.DataFrame): Raw DataFrame from load_data().
+    # convert date column
+    df_clean['date'] = pd.to_datetime(df_clean['date'], errors='coerce')
 
-    Returns:
-        pd.DataFrame: Cleaned DataFrame (do not modify the input in place).
-    """
-    # TODO: Start with df = df.copy() — never modify the input DataFrame in place
-    # TODO: Fill missing 'quantity' with df['quantity'].median()
-    # TODO: Fill missing 'unit_price' with df['unit_price'].median()
-    # TODO: Parse 'date' column: pd.to_datetime(df['date'], errors='coerce')
-    # TODO: Print progress and return cleaned DataFrame
-    pass
+    # drop rows where both quantity and unit_price are still missing
+    df_clean = df_clean.dropna(subset=['quantity', 'unit_price'], how='all')
+
+    print(f"Cleaned data: {len(df_clean)} records")
+    return df_clean
 
 
 def add_features(df):
-    """Compute derived columns.
+    """Add revenue and day_of_week columns. Returns an enriched DataFrame."""
+    
+    df_enriched = df.copy()
 
-    - Add 'revenue' column: quantity * unit_price.
-    - Add 'day_of_week' column: day name from the date column.
+    # create revenue column
+    df_enriched['revenue'] = df_enriched['quantity'] * df_enriched['unit_price']
 
-    Args:
-        df (pd.DataFrame): Cleaned DataFrame from clean_data().
+    # create day_of_week column
+    df_enriched['day_of_week'] = df_enriched['date'].dt.day_name()
 
-    Returns:
-        pd.DataFrame: DataFrame with new columns added.
-    """
-    # TODO: Start with df = df.copy()
-    # TODO: df['revenue'] = df['quantity'] * df['unit_price']
-    # TODO: df['day_of_week'] = df['date'].dt.day_name()
-    #        (requires 'date' to be datetime type — must call after clean_data)
-    # TODO: Return the enriched DataFrame
-    pass
+    return df_enriched
 
 
 def generate_summary(df):
-    """Compute summary statistics.
+    """Compute summary statistics. Returns a dict."""
+    
+    summary = {
+        'total_revenue': df['revenue'].sum(),
+        'avg_order_value': df['revenue'].mean(),
+        'top_category': df.groupby('product_category')['revenue'].sum().idxmax(),
+        'record_count': len(df)
+    }
+    
+    return summary
 
-    Args:
-        df (pd.DataFrame): Enriched DataFrame from add_features().
+def create_visualizations(df, output_dir="output"):
+    """Create and save 3 charts to output_dir."""
+    
+    os.makedirs(output_dir, exist_ok=True)
 
-    Returns:
-        dict: Summary with keys:
-            - 'total_revenue': total revenue (sum)
-            - 'avg_order_value': average order value (mean)
-            - 'top_category': product category with highest total revenue
-            - 'record_count': number of records in df
-    """
-    # TODO: Compute top category: df.groupby('product_category')['revenue'].sum().idxmax()
-    # TODO: Return a dict with the four keys above
-    pass
+    # Chart 1: total revenue by product category
+    revenue_by_category = df.groupby('product_category')['revenue'].sum()
 
+    fig, ax = plt.subplots()
+    revenue_by_category.plot(kind='bar', ax=ax)
+    ax.set_title("Total Revenue by Product Category")
+    ax.set_ylabel("Revenue")
 
-def create_visualizations(df, output_dir=OUTPUT_DIR):
-    """Create and save 3 charts as PNG files.
+    fig.savefig(f"{output_dir}/revenue_by_category.png", dpi=150, bbox_inches='tight')
+    plt.close(fig)
 
-    Charts to create:
-    1. Bar chart: total revenue by product category
-    2. Line chart: daily revenue trend (aggregate revenue by date)
-    3. Horizontal bar chart: average order value by payment method
+    # Chart 2: daily revenue trend
+    daily_revenue = df.groupby('date')['revenue'].sum()
 
-    Save each chart as a PNG using fig.savefig().
-    Do NOT use plt.show() — it blocks execution in pipeline scripts.
-    Close each figure with plt.close(fig) after saving.
+    fig, ax = plt.subplots()
+    daily_revenue.plot(kind='line', ax=ax)
+    ax.set_title("Daily Revenue Trend")
+    ax.set_ylabel("Revenue")
 
-    Args:
-        df (pd.DataFrame): Enriched DataFrame from add_features().
-        output_dir (str): Directory to save PNG files (create if needed).
-    """
-    # TODO: Create the output directory: os.makedirs(output_dir, exist_ok=True)
+    fig.savefig(f"{output_dir}/daily_revenue_trend.png", dpi=150, bbox_inches='tight')
+    plt.close(fig)
 
-    # TODO: Chart 1 — Bar chart: total revenue by product category
-    #   - Group by 'product_category', sum 'revenue'
-    #   - fig, ax = plt.subplots(figsize=(10, 6))
-    #   - ax.bar(categories, values) or use ax.barh() for horizontal
-    #   - Set title, labels
-    #   - fig.savefig(f'{output_dir}/revenue_by_category.png', dpi=150, bbox_inches='tight')
-    #   - plt.close(fig)
+    # Chart 3: average order value by payment method
+    avg_order = df.groupby('payment_method')['revenue'].mean()
 
-    # TODO: Chart 2 — Line chart: daily revenue trend
-    #   - Group by 'date', sum 'revenue' — sort by date
-    #   - ax.plot(dates, revenues)
-    #   - fig.savefig(f'{output_dir}/daily_revenue_trend.png', ...)
-    #   - plt.close(fig)
+    fig, ax = plt.subplots()
+    avg_order.plot(kind='barh', ax=ax)
+    ax.set_title("Average Order Value by Payment Method")
+    ax.set_xlabel("Average Revenue")
 
-    # TODO: Chart 3 — Horizontal bar chart: avg order value by payment method
-    #   - Group by 'payment_method', mean 'revenue'
-    #   - ax.barh(methods, avg_values)
-    #   - fig.savefig(f'{output_dir}/avg_order_by_payment.png', ...)
-    #   - plt.close(fig)
-
-    pass
-
-
+    fig.savefig(f"{output_dir}/avg_order_by_payment.png", dpi=150, bbox_inches='tight')
+    plt.close(fig)
+   
 def main():
-    """Run the full data pipeline end-to-end."""
-    # TODO: Call load_data(DATA_PATH)
-    # TODO: Call clean_data(df)
-    # TODO: Call add_features(df)
-    # TODO: Call generate_summary(df) and print the results
-    # TODO: Call create_visualizations(df)
-    # TODO: Print "Pipeline complete."
-    pass
+    """Run the full pipeline end-to-end."""
+    
+    df = load_data("data/sales_records.csv")
+
+    df = clean_data(df)
+
+    df = add_features(df)
+
+    summary = generate_summary(df)
+
+    print("Summary statistics:")
+    print(summary)
+
+    create_visualizations(df)
+
+    print("Pipeline complete.")
 
 
 if __name__ == "__main__":
